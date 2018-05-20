@@ -100,7 +100,7 @@ def parse_pcap(input_file):
 
         else:
             continue  # TODO: ignored
-
+        #packet.show()
         yield pkg_dict
 
 
@@ -113,4 +113,9 @@ if __name__ == "__main__":
 
     packages = parse_pcap(args.inputfile)
 
-    json.dump(SerializableGenerator(packages), sys.stdout, indent=4)
+    data = {
+        'file': args.inputfile.name,
+        'packages': SerializableGenerator(packages)
+    }
+
+    json.dump(data, sys.stdout, indent=4)
