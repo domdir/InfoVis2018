@@ -98,3 +98,10 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+#vs
+*.sln
+*.phpproj
+*.suo
+.vs/config/applicationhost.config
+InfoVis.phpproj.user
