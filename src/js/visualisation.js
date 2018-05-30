@@ -17,7 +17,17 @@ const dimensions = {
     timeSelector: {
         height: 20,
         handleRadius: 9
-    }
+    },
+	packageHistogram: {
+		margin: {
+            top: 20,
+            right: 20,
+            bottom: 30,
+            left: 50
+        },
+		height: 200,
+		width: 500
+	}
 };
 
 const elements = {
@@ -26,7 +36,10 @@ const elements = {
     },
     timeSelector: {
 
-    }
+    },
+	packageHistogram: {
+
+	}
 };
 
 const model = {
@@ -37,7 +50,11 @@ const model = {
     timeSelector: {
         currentValueLeft: null,
         currentValueRight: null
-    }
+    },
+	packageHistogram: {
+		minPackageSize: null,
+		maxPackageSize: null
+	}
 };
 
 /// ###########################################
@@ -53,6 +70,8 @@ d3.json("./assets/dump.json").then(function (data) {
 
     initTrafficOverview();
     initTimeSelector();
+	
+	initPackageHistogram()
 });
 
 function initTrafficOverview() {
@@ -158,6 +177,48 @@ function initTimeSelector() {
     eles.handleRight.attr("cx", eles.x(interval_max));
 }
 
+function initPackageHistogram() {
+	let packets = model.full.packages;
+
+    let package_size_min = Math.min.apply(Math, packets.map(x => x.pkg_size));
+    let package_size_max = Math.max.apply(Math, packets.map(x => x.pkg_size));
+    model.packageHistogram.minPackageSize = package_size_min;
+	model.packageHistogram.maxPackageSize = package_size_max;
+	
+	const eles = elements.packageHistogram;
+	
+	eles.svg = d3
+        .select("#package_histogram")
+        .append("svg")
+        .attr('width', dimensions.packageHistogram.width + dimensions.packageHistogram.margin.left + dimensions.packageHistogram.margin.right)
+        .attr('height', dimensions.packageHistogram.height+ dimensions.packageHistogram.margin.top + dimensions.packageHistogram.margin.bottom)
+        .style("border", "1px solid black");
+	
+    eles.x = d3.scaleLinear()
+        .rangeRound([dimensions.packageHistogram.width, 0]);
+    eles.y = d3.scaleLinear()
+        .rangeRound([dimensions.packageHistogram.height, 0]);
+	
+	eles.g = eles.svg.append("g")
+        .attr("transform", `translate(${dimensions.packageHistogram.margin.left},${dimensions.packageHistogram.margin.top})`);
+
+    eles.x = d3.scaleTime()
+        .rangeRound([0, dimensions.packageHistogram.width]);
+    eles.y = d3.scaleLinear()
+        .rangeRound([dimensions.packageHistogram.height, 0]);
+
+    eles.xaxis = d3.axisBottom().scale(eles.x);
+    eles.g_xaxis = eles.g.append("g")
+        .attr("class", "x axis")
+        .attr("transform", `translate(0, ${dimensions.packageHistogram.height})`);
+    eles.yaxis = d3.axisLeft().scale(eles.y);
+    eles.g_yaxis = eles.g.append('g').attr('class', 'y axis');
+
+    eles.g_xaxis.call(eles.xaxis);
+
+	updatePackageHistogram();
+}
+
 /// ###########################################
 /// ############ UPDATE FUNCTIONS #############
 /// ###########################################
@@ -229,6 +290,42 @@ function updateTrafficOverview() {
     renderTrafficOverview();
 }
 
+function updatePackageHistogram() {
+	let packets = model.full.packages;
+
+	let package_group_by_lambda = (map, size) => {
+		if (!(size in map)) {
+			map[size] = 1;
+		} else {
+			map[size] ++;
+		}
+		return map;
+	}
+	
+    let package_sizes = packets.map(x => x.pkg_size).reduce(package_group_by_lambda, {});
+
+	console.log(package_sizes);
+
+	let package_size_min = Math.min.apply(Math, packets.map(x => x.pkg_size));
+    let package_size_max = Math.max.apply(Math, packets.map(x => x.pkg_size));
+	
+	let cell_count = package_size_max - package_size_min;
+	
+	let cells = new Array(cell_count);
+    for (let i = 0; i < cells.length; i++) {
+        let size = i+package_size_min;
+        cells[i] = {
+            size: size,
+            count: size in package_sizes ? package_sizes[size] : 0
+        };
+    }
+	
+	console.log(cells);
+    model.packageHistogram.cells = cells;
+	
+	renderPackageHistogram();
+}
+
 /// ###########################################
 /// ############ RENDER FUNCTIONS #############
 /// ###########################################
@@ -274,4 +371,29 @@ function renderTrafficOverview () {
 
     path.exit().remove();
 
+}
+
+function renderPackageHistogram() {
+    const eles = elements.packageHistogram;
+
+    // draw graph
+    eles.x.domain(d3.extent(model.packageHistogram.cells, d => d.size));
+    eles.y.domain([0, d3.max(model.packageHistogram.cells, d => d.count)]);
+
+    eles.g_xaxis.call(eles.xaxis);
+    eles.g_yaxis.call(eles.yaxis);
+
+    const line = d3.line()
+        .x(d => eles.x(d.date))
+        .y(d => eles.y(d.value));
+
+    // TODO: enter/merge/exit?
+    eles.g.append("path")
+        .datum(model.packageHistogram.cells)
+        .attr("fill", "none")
+        .attr("stroke", "black")
+        .attr("stroke-linejoin", "round")
+        .attr("stroke-linecap", "round")
+        .attr("stroke-width", 1.5)
+        .attr("d", line);
 }
