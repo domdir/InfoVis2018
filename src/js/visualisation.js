@@ -11,7 +11,8 @@ const dimensions = {
             left: 50
         },
         width: null,
-        height: null
+        height: null,
+        cellDuration: 20
     },
     timeSelector: {
         height: 20,
@@ -127,7 +128,10 @@ function initTimeSelector() {
         .attr("class", "handle")
         .attr("r", dimensions.timeSelector.handleRadius)
         .call(d3.drag()
-            .on("start.interrupt", function () { eles.slider.interrupt(); })
+            .on("start.interrupt", function () {
+                eles.slider.interrupt();
+                updateTrafficOverview();
+            })
             .on("start drag", function () {
                 const val = Math.min(Math.max(eles.x.invert(d3.event.x).getTime(), interval_min), model.timeSelector.currentValueRight);
                 model.timeSelector.currentValueLeft = val;
@@ -139,7 +143,10 @@ function initTimeSelector() {
         .attr("class", "handle")
         .attr("r", dimensions.timeSelector.handleRadius)
         .call(d3.drag()
-            .on("start.interrupt", function () { eles.slider.interrupt(); })
+            .on("start.interrupt", function () {
+                eles.slider.interrupt();
+                updateTrafficOverview();
+            })
             .on("start drag", function () {
                 const val = Math.max(Math.min(eles.x.invert(d3.event.x).getTime(), interval_max), model.timeSelector.currentValueLeft);
                 model.timeSelector.currentValueRight = val;
@@ -161,8 +168,12 @@ function updateDimensions() {
 }
 
 function updateTrafficOverview() {
-    let packets = model.full.packages;
-
+    let packets = null;
+    if(model.timeSelector.currentValueRight && model.timeSelector.currentValueLeft){
+        packets = model.full.packages.filter(x => x.timestamp >= model.timeSelector.currentValueLeft && x.timestamp <= model.timeSelector.currentValueRight);
+    } else {
+        packets = model.full.packages;
+    }
     let interval_min = Math.min.apply(Math, packets.map(x => x.timestamp));
     let interval_max = Math.max.apply(Math, packets.map(x => x.timestamp));
     let duration = interval_max - interval_min;
@@ -170,7 +181,8 @@ function updateTrafficOverview() {
     console.log("interval: " + interval_min + " - " + interval_max + " [dur=" + duration + "]");
 
     // aggregate troughput
-    let cell_count = Math.ceil(duration);
+    const cellDuration = dimensions.trafficOverview.cellDuration;
+    let cell_count = Math.ceil(duration/cellDuration);
 
     if (Math.ceil(interval_min) == Math.ceil(interval_max)) {
         cell_count = 1;
@@ -182,10 +194,10 @@ function updateTrafficOverview() {
     for (let i = 0; i < cells.length; i++) {
         let begin = Math.floor(interval_min);
         cells[i] = {
-            begin: begin + i,
-            end: begin + i + 1,
-            center: begin + i + 0.5,
-            date: new Date((begin + i + 0.5) * 1000),
+            begin: begin + i*cellDuration,
+            end: begin + (i + 1)*cellDuration,
+            center: begin + (i + 0.5) * cellDuration,
+            date: new Date((begin + (i + 0.5) * cellDuration) * 1000),
             value: 0
         };
     }
@@ -236,12 +248,30 @@ function renderTrafficOverview () {
         .y(d => eles.y(d.value));
 
     // TODO: enter/merge/exit?
-    eles.g.append("path")
-        .datum(model.trafficOverview.cells)
+    //eles.g.append("path")
+    //    .datum(model.trafficOverview.cells)
+    //    .attr("fill", "none")
+    //    .attr("stroke", "black")
+    //    .attr("stroke-linejoin", "round")
+    //    .attr("stroke-linecap", "round")
+    //    .attr("stroke-width", 1.5)
+    //    .attr("d", line);
+
+    let path = eles.g.selectAll('.line')
+        .data([model.trafficOverview.cells]);
+
+    let path_enter = path.enter()
+        .append('path')
+        .attr('class', 'line')
         .attr("fill", "none")
         .attr("stroke", "black")
         .attr("stroke-linejoin", "round")
         .attr("stroke-linecap", "round")
-        .attr("stroke-width", 1.5)
-        .attr("d", line);
+        .attr("stroke-width", 1.5);
+
+    path.merge(path_enter).transition()
+        .attr('d', line);
+
+    path.exit().remove();
+
 }
