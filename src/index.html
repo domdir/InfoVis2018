@@ -13,7 +13,13 @@
       <div id="time_selector_overview"></div>
       <div id="time_selector"></div>
       <div id="package_histogram"></div>
-      <div id="package_protocols"></div>
+      <div id="package_protocols">
+          <input id="package_protocols_pkg_size" type="radio" value="1" name="package_protocols_pkg" checked />
+          <label for="package_protocols_pkg_size">PKG size</label>
+          <input id="package_protocols_pkg_count" type="radio" value="0" name="package_protocols_pkg" />
+          <label for="package_protocols_pkg_count">PKG count</label>
+          <br />
+      </div>
       <script src="./js/d3.js"></script>
       <script src="./js/visualisation.js"></script>
   </body>

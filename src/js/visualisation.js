@@ -241,6 +241,8 @@ function initTimeSelector() {
             .on("start.interrupt end", function () {
                 eles.slider.interrupt();
                 updateTrafficOverview();
+                updatePackageHistogram();
+                updatePackageProtocols();
             })
             .on("start drag", function () {
                 const val = Math.min(Math.max(eles.x.invert(d3.event.x).getTime(), interval_min), model.timeSelector.currentValueRight);
@@ -256,6 +258,8 @@ function initTimeSelector() {
             .on("start.interrupt end", function () {
                 eles.slider.interrupt();
                 updateTrafficOverview();
+                updatePackageHistogram();
+                updatePackageProtocols();
             })
             .on("start drag", function () {
                 const val = Math.max(Math.min(eles.x.invert(d3.event.x).getTime(), interval_max), model.timeSelector.currentValueLeft);
@@ -332,6 +336,11 @@ function initPackageProtocols() {
 
     eles.g_xaxis.call(eles.xaxis);
 
+    d3.selectAll('[name="package_protocols_pkg"]').on('change', function () {
+        model.packageProtocols.showSize = parseInt(d3.selectAll('[name="package_protocols_pkg"]:checked').attr('value'));
+        updatePackageProtocols();
+    })
+
     updatePackageProtocols();
 }
 
@@ -347,11 +356,17 @@ function updateDimensions() {
 }
 
 function updateTrafficOverview() {
-    let packets = null;
-    if(model.timeSelector.currentValueRight && model.timeSelector.currentValueLeft){
-        packets = model.full.packages.filter(x => x.timestamp >= model.timeSelector.currentValueLeft && x.timestamp <= model.timeSelector.currentValueRight);
-    } else {
-        packets = model.full.packages;
+    let packets = model.full.packages;
+    if (model.timeSelector.currentValueRight && model.timeSelector.currentValueLeft) {
+        packets = packets.filter(x => x.timestamp >= model.timeSelector.currentValueLeft && x.timestamp <= model.timeSelector.currentValueRight);
+    }
+
+    if (model.packageHistogram.minPackageSize && model.packageHistogram.maxPackageSize) {
+        packets = packets.filter(x => x.pkg_size >= model.packageHistogram.minPackageSize && x.pkg_size <= model.packageHistogram.maxPackageSize);
+    }
+
+    if (model.packageProtocols.selectedProtocols.length > 0) {
+        packets = packets.filter(x => model.packageProtocols.selectedProtocols.indexOf(x.protocol) >= 0);
     }
     
     model.trafficOverview.cells = aggregatePackages(packets, dimensions.trafficOverview.cellDuration);
@@ -360,7 +375,15 @@ function updateTrafficOverview() {
 }
 
 function updatePackageHistogram() {
-	let packets = model.full.packages;
+    let packets = model.full.packages;
+
+    if (model.timeSelector.currentValueRight && model.timeSelector.currentValueLeft) {
+        packets = packets.filter(x => x.timestamp >= model.timeSelector.currentValueLeft && x.timestamp <= model.timeSelector.currentValueRight);
+    }
+
+    if (model.packageProtocols.selectedProtocols.length > 0) {
+        packets = packets.filter(x => model.packageProtocols.selectedProtocols.indexOf(x.protocol) >= 0);
+    }
 
 	let package_group_by_lambda = (map, size) => {
 		if (!(size in map)) {
@@ -396,6 +419,14 @@ function updatePackageHistogram() {
 
 function updatePackageProtocols() {
     let packets = model.full.packages;
+
+    if (model.timeSelector.currentValueRight && model.timeSelector.currentValueLeft) {
+        packets = packets.filter(x => x.timestamp >= model.timeSelector.currentValueLeft && x.timestamp <= model.timeSelector.currentValueRight);
+    }
+
+    if (model.packageHistogram.minPackageSize && model.packageHistogram.maxPackageSize) {
+        packets = packets.filter(x => x.pkg_size >= model.packageHistogram.minPackageSize && x.pkg_size <= model.packageHistogram.maxPackageSize);
+    }
 
     let cells = packets.reduce((a, c) => {
         a[c.protocol] = a[c.protocol] || { protocol: c.protocol, value: 0 };
@@ -484,7 +515,23 @@ function renderPackageHistogram() {
         .attr("class", "bar")
         .attr('x', 1)
         .attr('width', 0)
-        .attr('height', 0);
+        .attr('height', 0)
+        .attr('data-min', (d) => d.x0)
+        .attr('data-max', (d) => d.x1)
+        .on('click', function () {
+            const clicked = d3.select(this);
+            if (clicked.classed('selected')) {
+                model.packageHistogram.minPackageSize = null;
+                model.packageHistogram.maxPackageSize = null;
+                clicked.classed('selected', false);
+            } else {
+                model.packageHistogram.minPackageSize = parseFloat(clicked.attr('data-min'));
+                model.packageHistogram.maxPackageSize = parseFloat(clicked.attr('data-max'));
+                clicked.classed('selected', true);
+            }
+            updateTrafficOverview();
+            updatePackageProtocols();
+        });
 
     bar.merge(bar_enter).transition()
         .attr("transform", function (d) {
@@ -516,7 +563,15 @@ function renderPackageProtocols() {
         .attr('x', 0)
         .attr('y', 0)
         .attr('width', 0)
-        .attr('height', 0);
+        .attr('height', 0)
+        .on('click', function () {
+            const clicked = d3.select(this);
+            clicked.classed('selected', !clicked.classed('selected'));
+            model.packageProtocols.selectedProtocols = [];
+            eles.g.selectAll('.selected').each((d) => model.packageProtocols.selectedProtocols.push(d.protocol));
+            updateTrafficOverview();
+            updatePackageHistogram();
+        });
     rect_enter.append('title');
 
     rect.merge(rect_enter).transition()

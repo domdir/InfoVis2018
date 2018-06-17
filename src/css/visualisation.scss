@@ -18,3 +18,15 @@
         cursor: grab;
     }
 }
+
+#package_histogram {
+    .selected {
+        opacity: 0.8;
+    }
+}
+
+#package_protocols {
+    .selected {
+        opacity: 0.8;
+    }
+}
