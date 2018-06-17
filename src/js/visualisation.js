@@ -14,6 +14,17 @@ const dimensions = {
         height: null,
         cellDuration: 20
     },
+    timeSelectorOverview: {
+        margin: {
+            top: 20,
+            right: 20,
+            bottom: 30,
+            left: 50
+        },
+        width: null,
+        height: null,
+        cellDuration: 40
+    },
     timeSelector: {
         height: 20,
         handleRadius: 9
@@ -32,6 +43,9 @@ const dimensions = {
 
 const elements = {
     trafficOverview: {
+
+    },
+    timeSelectorOverview: {
 
     },
     timeSelector: {
@@ -69,6 +83,7 @@ d3.json("./assets/dump.json").then(function (data) {
     updateDimensions();
 
     initTrafficOverview();
+    initTimeSelectorOverview();
     initTimeSelector();
 	
 	initPackageHistogram()
@@ -101,6 +116,63 @@ function initTrafficOverview() {
     eles.g_yaxis = eles.g.append('g').attr('class', 'y axis');
 
     updateTrafficOverview();
+}
+
+function initTimeSelectorOverview() {
+    // create traffic graph
+    const eles = elements.timeSelector;
+
+    eles.svg = d3
+        .select("#traffic_overview")
+        .append("svg")
+        .attr('width', dimensions.timeSelectorOverview.width + dimensions.timeSelectorOverview.margin.left + dimensions.timeSelectorOverview.margin.right)
+        .attr('height', dimensions.timeSelectorOverview.height + dimensions.timeSelectorOverview.margin.top + dimensions.timeSelectorOverview.margin.bottom)
+        .style("border", "1px solid black");
+
+    eles.g = eles.svg.append("g")
+        .attr("transform", `translate(${dimensions.timeSelectorOverview.margin.left},${dimensions.timeSelectorOverview.margin.top})`);
+
+    eles.x = d3.scaleTime()
+        .rangeRound([0, dimensions.timeSelectorOverview.width]);
+    eles.y = d3.scaleLinear()
+        .rangeRound([dimensions.timeSelectorOverview.height, 0]);
+
+    eles.xaxis = d3.axisBottom().scale(eles.x);
+    eles.g_xaxis = eles.g.append("g")
+        .attr("class", "x axis")
+        .attr("transform", `translate(0, ${dimensions.timeSelectorOverview.height})`);
+    eles.yaxis = d3.axisLeft().scale(eles.y);
+    eles.g_yaxis = eles.g.append('g').attr('class', 'y axis');
+
+    const cells = aggregatePackages(model.full.packages, dimensions.timeSelectorOverview.cellDuration);
+
+    // draw graph
+    eles.x.domain(d3.extent(cells, d => d.date));
+    eles.y.domain([0, d3.max(cells, d => d.value)]);
+
+    eles.g_xaxis.call(eles.xaxis);
+    eles.g_yaxis.call(eles.yaxis);
+
+    const line = d3.line()
+        .x(d => eles.x(d.date))
+        .y(d => eles.y(d.value));
+
+    let path = eles.g.selectAll('.line')
+        .data([cells]);
+
+    let path_enter = path.enter()
+        .append('path')
+        .attr('class', 'line')
+        .attr("fill", "none")
+        .attr("stroke", "black")
+        .attr("stroke-linejoin", "round")
+        .attr("stroke-linecap", "round")
+        .attr("stroke-width", 1.5);
+
+    path.merge(path_enter).transition()
+        .attr('d', line);
+
+    path.exit().remove();
 }
 
 function initTimeSelector() {
@@ -147,7 +219,7 @@ function initTimeSelector() {
         .attr("class", "handle")
         .attr("r", dimensions.timeSelector.handleRadius)
         .call(d3.drag()
-            .on("start.interrupt", function () {
+            .on("start.interrupt end", function () {
                 eles.slider.interrupt();
                 updateTrafficOverview();
             })
@@ -162,7 +234,7 @@ function initTimeSelector() {
         .attr("class", "handle")
         .attr("r", dimensions.timeSelector.handleRadius)
         .call(d3.drag()
-            .on("start.interrupt", function () {
+            .on("start.interrupt end", function () {
                 eles.slider.interrupt();
                 updateTrafficOverview();
             })
@@ -226,6 +298,8 @@ function initPackageHistogram() {
 function updateDimensions() {
     dimensions.trafficOverview.width = 960 - dimensions.trafficOverview.margin.left - dimensions.trafficOverview.margin.right;
     dimensions.trafficOverview.height = 500 - dimensions.trafficOverview.margin.top - dimensions.trafficOverview.margin.bottom;
+    dimensions.timeSelectorOverview.width = dimensions.trafficOverview.width;
+    dimensions.timeSelectorOverview.height = Math.round(dimensions.trafficOverview.height / 3);
 }
 
 function updateTrafficOverview() {
@@ -235,57 +309,8 @@ function updateTrafficOverview() {
     } else {
         packets = model.full.packages;
     }
-    let interval_min = Math.min.apply(Math, packets.map(x => x.timestamp));
-    let interval_max = Math.max.apply(Math, packets.map(x => x.timestamp));
-    let duration = interval_max - interval_min;
-
-    console.log("interval: " + interval_min + " - " + interval_max + " [dur=" + duration + "]");
-
-    // aggregate troughput
-    const cellDuration = dimensions.trafficOverview.cellDuration;
-    let cell_count = Math.ceil(duration/cellDuration);
-
-    if (Math.ceil(interval_min) == Math.ceil(interval_max)) {
-        cell_count = 1;
-    }
-
-    console.log("cell count: " + cell_count);
-
-    let cells = new Array(cell_count);
-    for (let i = 0; i < cells.length; i++) {
-        let begin = Math.floor(interval_min);
-        cells[i] = {
-            begin: begin + i*cellDuration,
-            end: begin + (i + 1)*cellDuration,
-            center: begin + (i + 0.5) * cellDuration,
-            date: new Date((begin + (i + 0.5) * cellDuration) * 1000),
-            value: 0
-        };
-    }
-
-    let last = 0;
-    for (let i = 0; i < cell_count; i++) {
-        cells[i].value = 0;
-        for (let j = last; j < packets.length; j++) {
-            let packet = packets[j];
-            if (packet.timestamp >= cells[i].end) {
-                break;
-            } else {
-                last = j;
-                cells[i].value += packet.pkg_size;
-            }
-        }
-    }
-
-    cells[0].begin = interval_min;
-    cells[cell_count - 1].end = interval_max;
-
-    for (let i = 0; i < cells.length; i++) {
-        cells[i].value /= (cells[i].end - cells[i].begin); // normalize to bytes/sec
-    }
-
-    console.log(cells);
-    model.trafficOverview.cells = cells;
+    
+    model.trafficOverview.cells = aggregatePackages(packets, dimensions.trafficOverview.cellDuration);
 
     renderTrafficOverview();
 }
@@ -396,4 +421,57 @@ function renderPackageHistogram() {
         .attr("stroke-linecap", "round")
         .attr("stroke-width", 1.5)
         .attr("d", line);
+}
+
+/// ###########################################
+/// ############ HELPER FUNCTIONS #############
+/// ###########################################
+
+function aggregatePackages(packets, cellDuration) {
+    let interval_min = Math.min.apply(Math, packets.map(x => x.timestamp));
+    let interval_max = Math.max.apply(Math, packets.map(x => x.timestamp));
+    let duration = interval_max - interval_min;
+
+    // aggregate troughput
+    let cell_count = Math.ceil(duration / cellDuration);
+
+    if (Math.ceil(interval_min) == Math.ceil(interval_max)) {
+        cell_count = 1;
+    }
+
+    let cells = new Array(cell_count);
+    for (let i = 0; i < cells.length; i++) {
+        let begin = Math.floor(interval_min);
+        cells[i] = {
+            begin: begin + i * cellDuration,
+            end: begin + (i + 1) * cellDuration,
+            center: begin + (i + 0.5) * cellDuration,
+            date: new Date((begin + (i + 0.5) * cellDuration) * 1000),
+            value: 0
+        };
+    }
+
+    let last = 0;
+    for (let i = 0; i < cell_count; i++) {
+        cells[i].value = 0;
+        for (let j = last; j < packets.length; j++) {
+            let packet = packets[j];
+            if (packet.timestamp >= cells[i].end) {
+                break;
+            } else {
+                last = j;
+                cells[i].value += packet.pkg_size;
+            }
+        }
+    }
+
+    cells[0].begin = interval_min;
+    cells[cell_count - 1].end = interval_max;
+
+    for (let i = 0; i < cells.length; i++) {
+        cells[i].value /= (cells[i].end - cells[i].begin); // normalize to bytes/sec
+    }
+
+    console.log(cells);
+    return cells;
 }
