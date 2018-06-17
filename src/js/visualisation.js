@@ -39,7 +39,18 @@ const dimensions = {
         },
 		height: 200,
         width: 500
-	}
+    },
+    packageProtocols: {
+        margin: {
+            top: 20,
+            right: 20,
+            bottom: 30,
+            left: 50
+        },
+        height: 200,
+        width: 500,
+        barPadding: 0.2
+    }
 };
 
 const elements = {
@@ -54,7 +65,10 @@ const elements = {
     },
 	packageHistogram: {
 
-	}
+    },
+    packageProtocols: {
+
+    }
 };
 
 const model = {
@@ -69,7 +83,11 @@ const model = {
 	packageHistogram: {
 		minPackageSize: null,
 		maxPackageSize: null
-	}
+    },
+    packageProtocols: {
+        selectedProtocols: [],
+        showSize: 1
+    }
 };
 
 /// ###########################################
@@ -86,8 +104,8 @@ d3.json("./assets/dump.json").then(function (data) {
     initTrafficOverview();
     initTimeSelectorOverview();
     initTimeSelector();
-	
-	initPackageHistogram()
+    initPackageHistogram();
+    initPackageProtocols();
 });
 
 function initTrafficOverview() {
@@ -267,11 +285,6 @@ function initPackageHistogram() {
         .attr('height', dimensions.packageHistogram.height+ dimensions.packageHistogram.margin.top + dimensions.packageHistogram.margin.bottom)
         .style("border", "1px solid black");
 	
-    eles.x = d3.scaleLinear()
-        .rangeRound([dimensions.packageHistogram.width, 0]);
-    eles.y = d3.scaleLinear()
-        .rangeRound([dimensions.packageHistogram.height, 0]);
-	
 	eles.g = eles.svg.append("g")
         .attr("transform", `translate(${dimensions.packageHistogram.margin.left},${dimensions.packageHistogram.margin.top})`);
 
@@ -290,6 +303,36 @@ function initPackageHistogram() {
     eles.g_xaxis.call(eles.xaxis);
 
 	updatePackageHistogram();
+}
+
+function initPackageProtocols() {
+    const eles = elements.packageProtocols;
+
+    eles.svg = d3
+        .select("#package_protocols")
+        .append("svg")
+        .attr('width', dimensions.packageProtocols.width + dimensions.packageProtocols.margin.left + dimensions.packageProtocols.margin.right)
+        .attr('height', dimensions.packageProtocols.height + dimensions.packageProtocols.margin.top + dimensions.packageProtocols.margin.bottom)
+        .style("border", "1px solid black");
+    
+    eles.g = eles.svg.append("g")
+        .attr("transform", `translate(${dimensions.packageProtocols.margin.left},${dimensions.packageProtocols.margin.top})`);
+
+    eles.x = d3.scaleBand()
+        .range([0, dimensions.packageProtocols.width]);
+    eles.y = d3.scaleLinear()
+        .rangeRound([dimensions.packageProtocols.height, 0]);
+
+    eles.xaxis = d3.axisBottom().scale(eles.x);
+    eles.g_xaxis = eles.g.append("g")
+        .attr("class", "x axis")
+        .attr("transform", `translate(0, ${dimensions.packageProtocols.height})`);
+    eles.yaxis = d3.axisLeft().scale(eles.y);
+    eles.g_yaxis = eles.g.append('g').attr('class', 'y axis');
+
+    eles.g_xaxis.call(eles.xaxis);
+
+    updatePackageProtocols();
 }
 
 /// ###########################################
@@ -351,6 +394,20 @@ function updatePackageHistogram() {
 	renderPackageHistogram();
 }
 
+function updatePackageProtocols() {
+    let packets = model.full.packages;
+
+    let cells = packets.reduce((a, c) => {
+        a[c.protocol] = a[c.protocol] || { protocol: c.protocol, value: 0 };
+        a[c.protocol].value += model.packageProtocols.showSize ? c.pkg_size : 1;
+        return a;
+    }, {});
+
+    model.packageProtocols.cells = Object.values(cells);
+
+    renderPackageProtocols();
+}
+
 /// ###########################################
 /// ############ RENDER FUNCTIONS #############
 /// ###########################################
@@ -405,14 +462,14 @@ function renderPackageHistogram() {
 
     eles.x.domain([model.packageHistogram.cells[0].size, model.packageHistogram.cells[model.packageHistogram.cells.length - 1].size]);
 
-    var histogram = d3.histogram()
+    let histogram = d3.histogram()
         .value(function (d) {
             return d.size;
         })
         .domain(eles.x.domain())
         .thresholds(eles.x.ticks());
 
-    var bins = histogram(model.packageHistogram.cells);
+    let bins = histogram(model.packageHistogram.cells);
 
     eles.y.domain([0, d3.max(bins, function (d) { return d.reduce((a, c) => a + c.count, 0); })]);
 
@@ -425,7 +482,9 @@ function renderPackageHistogram() {
     let bar_enter = bar.enter()
         .append("rect")
         .attr("class", "bar")
-        .attr("x", 1);
+        .attr('x', 1)
+        .attr('width', 0)
+        .attr('height', 0);
 
     bar.merge(bar_enter).transition()
         .attr("transform", function (d) {
@@ -439,6 +498,36 @@ function renderPackageHistogram() {
         });
 
     bar.exit().remove();
+}
+
+function renderPackageProtocols() {
+    const eles = elements.packageProtocols;
+
+    eles.x.domain(model.packageProtocols.cells.map((d) => d.protocol));
+    eles.y.domain([0, d3.max(model.packageProtocols.cells, (d) => d.value)]);
+
+    eles.g_xaxis.call(eles.xaxis);
+    eles.g_yaxis.call(eles.yaxis);
+
+    const rect = eles.g.selectAll('rect')
+        .data(model.packageProtocols.cells, (d) => d.protocol);
+
+    const rect_enter = rect.enter().append('rect')
+        .attr('x', 0)
+        .attr('y', 0)
+        .attr('width', 0)
+        .attr('height', 0);
+    rect_enter.append('title');
+
+    rect.merge(rect_enter).transition()
+        .attr('height', (d) => dimensions.packageProtocols.height - eles.y(d.value))
+        .attr('width', Math.round(eles.x.bandwidth()*(1-dimensions.packageProtocols.barPadding)))
+        .attr('x', (d) => eles.x(d.protocol) + eles.x.bandwidth() * dimensions.packageProtocols.barPadding/2)
+        .attr('y', (d) => eles.y(d.value));
+
+    rect.merge(rect_enter).select('title').text((d) => d.protocol);
+
+    rect.exit().remove();
 }
 
 /// ###########################################
