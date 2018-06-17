@@ -23,7 +23,8 @@ const dimensions = {
         },
         width: null,
         height: null,
-        cellDuration: 40
+        cellDuration: 40,
+        heightDivider: 5
     },
     timeSelector: {
         height: 20,
@@ -37,7 +38,7 @@ const dimensions = {
             left: 50
         },
 		height: 200,
-		width: 500
+        width: 500
 	}
 };
 
@@ -274,7 +275,7 @@ function initPackageHistogram() {
 	eles.g = eles.svg.append("g")
         .attr("transform", `translate(${dimensions.packageHistogram.margin.left},${dimensions.packageHistogram.margin.top})`);
 
-    eles.x = d3.scaleTime()
+    eles.x = d3.scaleLinear()
         .rangeRound([0, dimensions.packageHistogram.width]);
     eles.y = d3.scaleLinear()
         .rangeRound([dimensions.packageHistogram.height, 0]);
@@ -299,7 +300,7 @@ function updateDimensions() {
     dimensions.trafficOverview.width = 960 - dimensions.trafficOverview.margin.left - dimensions.trafficOverview.margin.right;
     dimensions.trafficOverview.height = 500 - dimensions.trafficOverview.margin.top - dimensions.trafficOverview.margin.bottom;
     dimensions.timeSelectorOverview.width = dimensions.trafficOverview.width;
-    dimensions.timeSelectorOverview.height = Math.round(dimensions.trafficOverview.height / 3);
+    dimensions.timeSelectorOverview.height = Math.round(dimensions.trafficOverview.height / dimensions.timeSelectorOverview.heightDivider);
 }
 
 function updateTrafficOverview() {
@@ -344,8 +345,7 @@ function updatePackageHistogram() {
             count: size in package_sizes ? package_sizes[size] : 0
         };
     }
-	
-	console.log(cells);
+
     model.packageHistogram.cells = cells;
 	
 	renderPackageHistogram();
@@ -402,25 +402,43 @@ function renderPackageHistogram() {
     const eles = elements.packageHistogram;
 
     // draw graph
-    eles.x.domain(d3.extent(model.packageHistogram.cells, d => d.size));
-    eles.y.domain([0, d3.max(model.packageHistogram.cells, d => d.count)]);
+
+    eles.x.domain([model.packageHistogram.cells[0].size, model.packageHistogram.cells[model.packageHistogram.cells.length - 1].size]);
+
+    var histogram = d3.histogram()
+        .value(function (d) {
+            return d.size;
+        })
+        .domain(eles.x.domain())
+        .thresholds(eles.x.ticks());
+
+    var bins = histogram(model.packageHistogram.cells);
+
+    eles.y.domain([0, d3.max(bins, function (d) { return d.reduce((a, c) => a + c.count, 0); })]);
 
     eles.g_xaxis.call(eles.xaxis);
     eles.g_yaxis.call(eles.yaxis);
 
-    const line = d3.line()
-        .x(d => eles.x(d.date))
-        .y(d => eles.y(d.value));
+    let bar = eles.g.selectAll("rect")
+        .data(bins);
 
-    // TODO: enter/merge/exit?
-    eles.g.append("path")
-        .datum(model.packageHistogram.cells)
-        .attr("fill", "none")
-        .attr("stroke", "black")
-        .attr("stroke-linejoin", "round")
-        .attr("stroke-linecap", "round")
-        .attr("stroke-width", 1.5)
-        .attr("d", line);
+    let bar_enter = bar.enter()
+        .append("rect")
+        .attr("class", "bar")
+        .attr("x", 1);
+
+    bar.merge(bar_enter).transition()
+        .attr("transform", function (d) {
+            return "translate(" + eles.x(d.x0) + "," + eles.y(d.reduce((a, c) => a + c.count, 0)) + ")";
+        })
+        .attr("width", function (d) {
+            return eles.x(d.x1) - eles.x(d.x0) - 1;
+        })
+        .attr("height", function (d) {
+            return dimensions.packageHistogram.height - eles.y(d.reduce((a, c) => a + c.count, 0));
+        });
+
+    bar.exit().remove();
 }
 
 /// ###########################################
