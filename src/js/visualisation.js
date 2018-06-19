@@ -101,6 +101,7 @@ d3.json("./assets/dump.json").then(function (data) {
 
     updateDimensions();
 
+    //initialize all charts
     initTrafficOverview();
     initTimeSelectorOverview();
     initTimeSelector();
@@ -134,6 +135,7 @@ function initTrafficOverview() {
     eles.yaxis = d3.axisLeft().scale(eles.y).tickFormat(formatPrefix);
     eles.g_yaxis = eles.g.append('g').attr('class', 'y axis');
 
+    //add axis label
     eles.svg
         .append("text")
         .attr("class", "x label")
@@ -224,6 +226,7 @@ function initTimeSelector() {
         .rangeRound([0, dimensions.trafficOverview.width])
         .domain([interval_min, interval_max]);
 
+    //add slidable selectors
     eles.svg = d3
         .select("#time_selector")
         .append("svg")
@@ -248,17 +251,18 @@ function initTimeSelector() {
         .attr("class", "x axis")
         .attr("transform", `translate(0, ${dimensions.timeSelector.height})`);
     
+    //add the handles
     eles.handleLeft = eles.slider.insert("circle")
         .attr("class", "handle")
         .attr("r", dimensions.timeSelector.handleRadius)
         .call(d3.drag()
-            .on("start.interrupt end", function () {
+            .on("start.interrupt end", function () {    //update other charts
                 eles.slider.interrupt();
                 updateTrafficOverview();
                 updatePackageHistogram();
                 updatePackageProtocols();
             })
-            .on("start drag", function () {
+            .on("start drag", function () { //handle drag
                 const val = Math.min(Math.max(eles.x.invert(d3.event.x).getTime(), interval_min), model.timeSelector.currentValueRight);
                 model.timeSelector.currentValueLeft = val;
                 eles.handleLeft.attr("cx", eles.x(val));
@@ -269,24 +273,27 @@ function initTimeSelector() {
         .attr("class", "handle")
         .attr("r", dimensions.timeSelector.handleRadius)
         .call(d3.drag()
-            .on("start.interrupt end", function () {
+            .on("start.interrupt end", function () {    //update other charts
                 eles.slider.interrupt();
                 updateTrafficOverview();
                 updatePackageHistogram();
                 updatePackageProtocols();
             })
-            .on("start drag", function () {
+            .on("start drag", function () { //handle drag
                 const val = Math.max(Math.min(eles.x.invert(d3.event.x).getTime(), interval_max), model.timeSelector.currentValueLeft);
                 model.timeSelector.currentValueRight = val;
                 eles.handleRight.attr("cx", eles.x(val));
             })
     );
 
+    //set initial value
     eles.handleLeft.attr("cx", eles.x(interval_min));
     eles.handleRight.attr("cx", eles.x(interval_max));
 }
 
 function initPackageHistogram() {
+    //create package histogram
+
 	let packets = model.full.packages;
 
     let package_size_min = Math.min.apply(Math, packets.map(x => x.pkg_size));
@@ -306,7 +313,7 @@ function initPackageHistogram() {
 	eles.g = eles.svg.append("g")
         .attr("transform", `translate(${dimensions.packageHistogram.margin.left},${dimensions.packageHistogram.margin.top})`);
 
-    eles.x = d3.scaleLog()
+    eles.x = d3.scaleLog()  //use of natural log scale
         .base(Math.E)
         .rangeRound([0, dimensions.packageHistogram.width]);
     eles.y = d3.scaleLinear()
@@ -321,6 +328,7 @@ function initPackageHistogram() {
 
     eles.g_xaxis.call(eles.xaxis);
 
+    //add axis labels
     eles.svg
         .append("text")
         .attr("class", "x label")
@@ -341,6 +349,8 @@ function initPackageHistogram() {
 }
 
 function initPackageProtocols() {
+    //create protocols diagram
+
     const eles = elements.packageProtocols;
 
     eles.svg = d3
@@ -367,6 +377,7 @@ function initPackageProtocols() {
 
     eles.g_xaxis.call(eles.xaxis);
 
+    //add axis label
     eles.svg
         .append("text")
         .attr("class", "x label")
@@ -375,6 +386,7 @@ function initPackageProtocols() {
         .attr("y", dimensions.packageProtocols.margin.top - 5)
         .text("PKG");
 
+    //handle user interaction on the radio boxes
     d3.selectAll('[name="package_protocols_pkg"]').on('change', function () {
         model.packageProtocols.showSize = parseInt(d3.selectAll('[name="package_protocols_pkg"]:checked').attr('value'));
         updatePackageProtocols();
@@ -388,6 +400,7 @@ function initPackageProtocols() {
 /// ###########################################
 
 function updateDimensions() {
+    //set the widths of the charts to fit into the flex divs
     dimensions.trafficOverview.width = (document.getElementById('traffic_overview_container').offsetWidth-20) - dimensions.trafficOverview.margin.left - dimensions.trafficOverview.margin.right;
     dimensions.trafficOverview.height = (document.getElementById('traffic_overview_container').offsetWidth-20) * 500 / 960 - dimensions.trafficOverview.margin.top - dimensions.trafficOverview.margin.bottom;
     dimensions.timeSelectorOverview.width = dimensions.trafficOverview.width;
@@ -398,6 +411,7 @@ function updateDimensions() {
 }
 
 function updateTrafficOverview() {
+    //apply filters
     let packets = model.full.packages;
     if (model.timeSelector.currentValueRight && model.timeSelector.currentValueLeft) {
         packets = packets.filter(x => x.timestamp >= model.timeSelector.currentValueLeft && x.timestamp <= model.timeSelector.currentValueRight);
@@ -417,6 +431,7 @@ function updateTrafficOverview() {
 }
 
 function updatePackageHistogram() {
+    //apply filters
     let packets = model.full.packages;
 
     if (model.timeSelector.currentValueRight && model.timeSelector.currentValueLeft) {
@@ -427,6 +442,7 @@ function updatePackageHistogram() {
         packets = packets.filter(x => model.packageProtocols.selectedProtocols.indexOf(x.protocol) >= 0);
     }
 
+    //transform data into list of package sizes
 	let package_group_by_lambda = (map, size) => {
 		if (!(size in map)) {
 			map[size] = 1;
@@ -460,6 +476,7 @@ function updatePackageHistogram() {
 }
 
 function updatePackageProtocols() {
+    //apply filters
     let packets = model.full.packages;
 
     if (model.timeSelector.currentValueRight && model.timeSelector.currentValueLeft) {
@@ -499,18 +516,8 @@ function renderTrafficOverview () {
         .x(d => eles.x(d.date))
         .y(d => eles.y(d.value));
 
-    // TODO: enter/merge/exit?
-    //eles.g.append("path")
-    //    .datum(model.trafficOverview.cells)
-    //    .attr("fill", "none")
-    //    .attr("stroke", "black")
-    //    .attr("stroke-linejoin", "round")
-    //    .attr("stroke-linecap", "round")
-    //    .attr("stroke-width", 1.5)
-    //    .attr("d", line);
-
     let path = eles.g.selectAll('.line')
-        .data([model.trafficOverview.cells]);
+        .data([model.trafficOverview.cells]);   //only draw a single line
 
     let path_enter = path.enter()
         .append('path')
@@ -535,6 +542,7 @@ function renderPackageHistogram() {
 
     eles.x.domain([model.packageHistogram.cells[0].size, model.packageHistogram.cells[model.packageHistogram.cells.length - 1].size]);
 
+    //let d3 automatically split the data into groups for the histogram
     let histogram = d3.histogram()
         .value(function (d) {
             return d.size;
@@ -560,7 +568,7 @@ function renderPackageHistogram() {
         .attr('height', 0)
         .attr('data-min', (d) => d.x0)
         .attr('data-max', (d) => d.x1)
-        .on('click', function () {
+        .on('click', function () {  //set filters when user clicks onto a bar, and update other charts
             const clicked = d3.select(this);
             if (clicked.classed('selected')) {
                 model.packageHistogram.minPackageSize = null;
@@ -576,6 +584,7 @@ function renderPackageHistogram() {
             updatePackageProtocols();
         });
 
+    //set the dimensions of the bars
     bar.merge(bar_enter).transition()
         .attr("transform", function (d) {
             return "translate(" + eles.x(d.x0) + "," + eles.y(d.reduce((a, c) => a + c.count, 0)) + ")";
@@ -607,7 +616,7 @@ function renderPackageProtocols() {
         .attr('y', 0)
         .attr('width', 0)
         .attr('height', 0)
-        .on('click', function () {
+        .on('click', function () {  //set filters when user clicks onto a bar, and update other charts
             const clicked = d3.select(this);
             clicked.classed('selected', !clicked.classed('selected'));
             model.packageProtocols.selectedProtocols = [];
@@ -617,12 +626,14 @@ function renderPackageProtocols() {
         });
     rect_enter.append('title');
 
+    //set the dimensions of the bars
     rect.merge(rect_enter).transition()
         .attr('height', (d) => dimensions.packageProtocols.height - eles.y(d.value))
         .attr('width', Math.round(eles.x.bandwidth()*(1-dimensions.packageProtocols.barPadding)))
         .attr('x', (d) => eles.x(d.protocol) + eles.x.bandwidth() * dimensions.packageProtocols.barPadding/2)
         .attr('y', (d) => eles.y(d.value));
 
+    //set onhover title
     rect.merge(rect_enter).select('title').text((d) => d.protocol);
 
     rect.exit().remove();
@@ -632,7 +643,7 @@ function renderPackageProtocols() {
 /// ############ HELPER FUNCTIONS #############
 /// ###########################################
 
-function aggregatePackages(packets, cellDuration) {
+function aggregatePackages(packets, cellDuration) {     //transform the data into a set package bytes per second
     let interval_min = Math.min.apply(Math, packets.map(x => x.timestamp));
     let interval_max = Math.max.apply(Math, packets.map(x => x.timestamp));
     let duration = interval_max - interval_min;
@@ -644,6 +655,7 @@ function aggregatePackages(packets, cellDuration) {
         cell_count = 1;
     }
 
+    //set initial values for each timespan
     let cells = new Array(cell_count);
     for (let i = 0; i < cells.length; i++) {
         let begin = Math.floor(interval_min);
@@ -656,6 +668,7 @@ function aggregatePackages(packets, cellDuration) {
         };
     }
 
+    //put the data into the buckets
     let last = 0;
     for (let i = 0; i < cell_count; i++) {
         cells[i].value = 0;
@@ -681,7 +694,7 @@ function aggregatePackages(packets, cellDuration) {
     return cells;
 }
 
-function formatPrefix(v) {
+function formatPrefix(v) {  //extends the d3.format("s") function to remove trailing zeros
     if (v < 1000) return '' + v;
 
     let s = d3.format("s")(v);
