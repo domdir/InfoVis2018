@@ -131,7 +131,7 @@ function initTrafficOverview() {
     eles.g_xaxis = eles.g.append("g")
         .attr("class", "x axis")
         .attr("transform", `translate(0, ${dimensions.trafficOverview.height})`);
-    eles.yaxis = d3.axisLeft().scale(eles.y);
+    eles.yaxis = d3.axisLeft().scale(eles.y).tickFormat(formatPrefix);
     eles.g_yaxis = eles.g.append('g').attr('class', 'y axis');
 
     updateTrafficOverview();
@@ -160,7 +160,7 @@ function initTimeSelectorOverview() {
     eles.g_xaxis = eles.g.append("g")
         .attr("class", "x axis")
         .attr("transform", `translate(0, ${dimensions.timeSelectorOverview.height})`);
-    eles.yaxis = d3.axisLeft().scale(eles.y);
+    eles.yaxis = d3.axisLeft().scale(eles.y).tickFormat(formatPrefix);
     eles.g_yaxis = eles.g.append('g').attr('class', 'y axis');
 
     const cells = aggregatePackages(model.full.packages, dimensions.timeSelectorOverview.cellDuration);
@@ -231,9 +231,7 @@ function initTimeSelector() {
     eles.g_xaxis = eles.slider.append("g")
         .attr("class", "x axis")
         .attr("transform", `translate(0, ${dimensions.timeSelector.height})`);
-
-    eles.g_xaxis.call(eles.xaxis);
-
+    
     eles.handleLeft = eles.slider.insert("circle")
         .attr("class", "handle")
         .attr("r", dimensions.timeSelector.handleRadius)
@@ -292,16 +290,17 @@ function initPackageHistogram() {
 	eles.g = eles.svg.append("g")
         .attr("transform", `translate(${dimensions.packageHistogram.margin.left},${dimensions.packageHistogram.margin.top})`);
 
-    eles.x = d3.scaleLinear()
+    eles.x = d3.scaleLog()
+        .base(Math.E)
         .rangeRound([0, dimensions.packageHistogram.width]);
     eles.y = d3.scaleLinear()
         .rangeRound([dimensions.packageHistogram.height, 0]);
 
-    eles.xaxis = d3.axisBottom().scale(eles.x);
+    eles.xaxis = d3.axisBottom().scale(eles.x).tickFormat((v) => Math.floor(v));
     eles.g_xaxis = eles.g.append("g")
         .attr("class", "x axis")
         .attr("transform", `translate(0, ${dimensions.packageHistogram.height})`);
-    eles.yaxis = d3.axisLeft().scale(eles.y);
+    eles.yaxis = d3.axisLeft().scale(eles.y).tickFormat(formatPrefix);
     eles.g_yaxis = eles.g.append('g').attr('class', 'y axis');
 
     eles.g_xaxis.call(eles.xaxis);
@@ -331,7 +330,7 @@ function initPackageProtocols() {
     eles.g_xaxis = eles.g.append("g")
         .attr("class", "x axis")
         .attr("transform", `translate(0, ${dimensions.packageProtocols.height})`);
-    eles.yaxis = d3.axisLeft().scale(eles.y);
+    eles.yaxis = d3.axisLeft().scale(eles.y).tickFormat(formatPrefix);
     eles.g_yaxis = eles.g.append('g').attr('class', 'y axis');
 
     eles.g_xaxis.call(eles.xaxis);
@@ -636,4 +635,24 @@ function aggregatePackages(packets, cellDuration) {
 
     console.log(cells);
     return cells;
+}
+
+function formatPrefix(v) {
+    if (v < 1000) return '' + v;
+
+    let s = d3.format("s")(v);
+    let dotPosition = s.indexOf('.');
+    if (dotPosition === -1) return s;
+
+    let symbol = s.charAt(s.length - 1);
+
+    do {
+        s = s.substr(0, s.length - 1);
+    } while ('0' === s.charAt(s.length - 1));
+
+    if (s.length - 1 === dotPosition) {
+        s = s.substr(0, s.length - 1);
+    }
+
+    return s + symbol;
 }
