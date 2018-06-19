@@ -95,7 +95,7 @@ const model = {
 /// ###########################################
 
 // load data
-d3.json("./assets/dump.json").then(function (data) {
+d3.json("./assets/test.json").then(function (data) {
     console.log(data);
     model.full = data;
 
