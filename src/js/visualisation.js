@@ -134,6 +134,14 @@ function initTrafficOverview() {
     eles.yaxis = d3.axisLeft().scale(eles.y).tickFormat(formatPrefix);
     eles.g_yaxis = eles.g.append('g').attr('class', 'y axis');
 
+    eles.svg
+        .append("text")
+        .attr("class", "x label")
+        .attr("text-anchor", "middle")
+        .attr("x", dimensions.trafficOverview.margin.left - 5)
+        .attr("y", dimensions.trafficOverview.margin.top - 5)
+        .text("B/s");
+
     updateTrafficOverview();
 }
 
@@ -162,6 +170,14 @@ function initTimeSelectorOverview() {
         .attr("transform", `translate(0, ${dimensions.timeSelectorOverview.height})`);
     eles.yaxis = d3.axisLeft().scale(eles.y).tickFormat(formatPrefix);
     eles.g_yaxis = eles.g.append('g').attr('class', 'y axis');
+
+    eles.svg
+        .append("text")
+        .attr("class", "x label")
+        .attr("text-anchor", "middle")
+        .attr("x", dimensions.timeSelectorOverview.margin.left - 5)
+        .attr("y", dimensions.timeSelectorOverview.margin.top - 5)
+        .text("B/s");
 
     const cells = aggregatePackages(model.full.packages, dimensions.timeSelectorOverview.cellDuration);
 
@@ -305,6 +321,22 @@ function initPackageHistogram() {
 
     eles.g_xaxis.call(eles.xaxis);
 
+    eles.svg
+        .append("text")
+        .attr("class", "x label")
+        .attr("text-anchor", "middle")
+        .attr("x", dimensions.packageHistogram.margin.left - 5)
+        .attr("y", dimensions.packageHistogram.margin.top - 5)
+        .text("PKG count");
+
+    eles.svg
+        .append("text")
+        .attr("class", "x label")
+        .attr("text-anchor", "middle")
+        .attr("x", dimensions.packageHistogram.width + dimensions.packageHistogram.margin.left - dimensions.packageHistogram.margin.right - 5)
+        .attr("y", dimensions.packageHistogram.height + dimensions.packageHistogram.margin.top + dimensions.packageHistogram.margin.top)
+        .text("PKG size (B)");
+
 	updatePackageHistogram();
 }
 
@@ -335,6 +367,14 @@ function initPackageProtocols() {
 
     eles.g_xaxis.call(eles.xaxis);
 
+    eles.svg
+        .append("text")
+        .attr("class", "x label")
+        .attr("text-anchor", "middle")
+        .attr("x", dimensions.packageProtocols.margin.left - 5)
+        .attr("y", dimensions.packageProtocols.margin.top - 5)
+        .text("PKG");
+
     d3.selectAll('[name="package_protocols_pkg"]').on('change', function () {
         model.packageProtocols.showSize = parseInt(d3.selectAll('[name="package_protocols_pkg"]:checked').attr('value'));
         updatePackageProtocols();
@@ -348,10 +388,13 @@ function initPackageProtocols() {
 /// ###########################################
 
 function updateDimensions() {
-    dimensions.trafficOverview.width = 960 - dimensions.trafficOverview.margin.left - dimensions.trafficOverview.margin.right;
-    dimensions.trafficOverview.height = 500 - dimensions.trafficOverview.margin.top - dimensions.trafficOverview.margin.bottom;
+    dimensions.trafficOverview.width = (document.getElementById('traffic_overview_container').offsetWidth-20) - dimensions.trafficOverview.margin.left - dimensions.trafficOverview.margin.right;
+    dimensions.trafficOverview.height = (document.getElementById('traffic_overview_container').offsetWidth-20) * 500 / 960 - dimensions.trafficOverview.margin.top - dimensions.trafficOverview.margin.bottom;
     dimensions.timeSelectorOverview.width = dimensions.trafficOverview.width;
     dimensions.timeSelectorOverview.height = Math.round(dimensions.trafficOverview.height / dimensions.timeSelectorOverview.heightDivider);
+
+    dimensions.packageHistogram.width = dimensions.trafficOverview.width * 0.6;
+    dimensions.packageProtocols.width = dimensions.trafficOverview.width * 0.6;
 }
 
 function updateTrafficOverview() {
@@ -524,6 +567,7 @@ function renderPackageHistogram() {
                 model.packageHistogram.maxPackageSize = null;
                 clicked.classed('selected', false);
             } else {
+                d3.select(clicked.node().parentNode).selectAll('.selected').classed('selected', false);
                 model.packageHistogram.minPackageSize = parseFloat(clicked.attr('data-min'));
                 model.packageHistogram.maxPackageSize = parseFloat(clicked.attr('data-max'));
                 clicked.classed('selected', true);

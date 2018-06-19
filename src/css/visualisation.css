@@ -20,3 +20,12 @@
 #package_protocols .selected {
   opacity: 0.8; }
 
+#charts {
+  display: flex; }
+  #charts #traffic_overview_container {
+    flex: 0 0 60%;
+    margin: 5px; }
+  #charts #package_container {
+    flex: 0 0 40%;
+    margin: 5px; }
+
